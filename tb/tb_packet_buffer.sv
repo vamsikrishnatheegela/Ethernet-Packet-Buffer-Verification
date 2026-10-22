@@ -20,6 +20,10 @@ module tb_packet_buffer;
     integer sb_errors;
     integer sb_checked;
     integer i;
+    logic stalled_prev = 1'b0;
+    logic [31:0] stalled_data;
+    logic [3:0] stalled_keep;
+    logic stalled_last;
 
     always #5 clk = ~clk;
 
@@ -40,6 +44,26 @@ module tb_packet_buffer;
         .out_data(out_data), .out_keep(out_keep), .out_last(out_last),
         .error_count(sb_errors), .checked_count(sb_checked)
     );
+
+    // A valid output beat must remain asserted and unchanged while stalled.
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            stalled_prev <= 1'b0;
+        end else begin
+            if (stalled_prev &&
+                ((!out_valid) || (out_data !== stalled_data) ||
+                 (out_keep !== stalled_keep) || (out_last !== stalled_last))) begin
+                $display("FAIL: output changed while stalled");
+                $fatal(1);
+            end
+            stalled_prev <= out_valid && !out_ready;
+            if (out_valid && !out_ready) begin
+                stalled_data <= out_data;
+                stalled_keep <= out_keep;
+                stalled_last <= out_last;
+            end
+        end
+    end
 
     task automatic send_beat(
         input logic [31:0] data,
@@ -93,6 +117,44 @@ module tb_packet_buffer;
 
         out_ready = 1'b1;
         repeat (DEPTH+2) @(negedge clk);
+
+        // Randomized ready/valid traffic. The driver holds each beat stable
+        // until its input handshake has completed.
+        begin : randomized_traffic
+            integer cycle;
+            integer accepted_inputs;
+            logic accepted_previous;
+            accepted_inputs = 0;
+            accepted_previous = 1'b0;
+            @(negedge clk);
+            for (cycle = 0; cycle < 400 && accepted_inputs < 64; cycle = cycle + 1) begin
+                if (accepted_previous)
+                    in_valid = 1'b0;
+                if (!in_valid && accepted_inputs < 64 &&
+                    ($urandom_range(0, 99) < 75)) begin
+                    in_valid = 1'b1;
+                    in_data = $urandom;
+                    in_keep = $urandom_range(1, 15);
+                    in_last = ($urandom_range(0, 3) == 0);
+                end
+                out_ready = ($urandom_range(0, 99) < 60);
+                @(posedge clk);
+                accepted_previous = in_valid && in_ready;
+                if (accepted_previous)
+                    accepted_inputs = accepted_inputs + 1;
+                @(negedge clk);
+            end
+            if (accepted_inputs != 64) begin
+                $display("FAIL: randomized driver accepted only %0d of 64 beats",
+                         accepted_inputs);
+                $fatal(1);
+            end
+            in_valid = 1'b0;
+            out_ready = 1'b1;
+            while (occupancy != 0)
+                @(negedge clk);
+            out_ready = 1'b0;
+        end
 
         // Allow scoreboard and output logic to settle.
         repeat (2) @(negedge clk);
