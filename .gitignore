@@ -1,0 +1,17 @@
+# Simulation outputs
+results/*
+!results/.gitkeep
+*.vcd
+*.fst
+*.lxt
+*.lxt2
+*.vvp
+*.out
+*.log
+
+# Editor and OS files
+*~
+*.swp
+*.swo
+.DS_Store
+.vscode/
