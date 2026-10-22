@@ -63,7 +63,7 @@ gtkwave results/packet_buffer.vcd
 | Scoreboard | Accepted-beat reference queue; compares data, keep, and last on output handshakes; detects loss, duplication, reordering, and field corruption within exercised traffic |
 | Functional coverage | Counts empty/full cycles, input/output stalls, simultaneous transfers, partial-keep beats, and end-of-packet beats; required scenarios must be observed for the test to pass |\n| Automation | Compile/run status and explicit PASS-signature checks |
 
-The packet-buffer testbench combines directed scenarios with 64 accepted randomized input beats, a queue-based reference scoreboard, an output-stability check during backpressure, and functional coverage counters for key FIFO and ready/valid scenarios. Coverage counters are reported in the simulation log, and the regression fails if required coverage points are not reached. This is a lightweight directed/randomized environment, not a formal proof or a complete protocol-assertion suite.
+The packet-buffer testbench combines directed scenarios with 64 accepted randomized input beats per run, a queue-based reference scoreboard, an output-stability check during backpressure, an occupancy invariant check, and functional coverage counters for key FIFO and ready/valid scenarios. The regression runs five deterministic seeds (1, 7, 42, 2026, and 65535). Coverage counters and per-seed logs are written under `results/`. GitHub Actions runs the multi-seed regression and both Verilator lint checks on pushes and pull requests. This is a lightweight directed/randomized environment, not a formal proof or exhaustive protocol verification.
 
 ## Design documentation
 
