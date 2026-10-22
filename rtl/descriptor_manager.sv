@@ -5,16 +5,16 @@ module descriptor_manager #(
     parameter integer ID_WIDTH = (NUM_DESC <= 1) ? 1 : $clog2(NUM_DESC),
     parameter integer COUNT_WIDTH = $clog2(NUM_DESC + 1)
 ) (
-    input  logic                  clk,
-    input  logic                  rst_n,
+    input  logic                   clk,
+    input  logic                   rst_n,
 
-    input  logic                  alloc_req,
-    output logic                  alloc_ready,
-    output logic [ID_WIDTH-1:0]   alloc_id,
+    input  logic                   alloc_req,
+    output logic                   alloc_ready,
+    output logic [ID_WIDTH-1:0]    alloc_id,
 
-    input  logic                  free_valid,
-    input  logic [ID_WIDTH-1:0]   free_id,
-    output logic                  free_error,
+    input  logic                   free_valid,
+    input  logic [ID_WIDTH-1:0]    free_id,
+    output logic                   free_error,
 
     output logic [COUNT_WIDTH-1:0] allocated_count
 );
@@ -22,7 +22,8 @@ module descriptor_manager #(
     logic [NUM_DESC-1:0] allocated;
     logic                free_found;
     logic [ID_WIDTH-1:0] free_candidate;
-    integer i;
+    logic                free_accept;
+    logic                alloc_accept;
 
     // First-fit allocation: choose the lowest-numbered unallocated descriptor.
     always_comb begin
@@ -38,6 +39,14 @@ module descriptor_manager #(
 
     assign alloc_ready = free_found;
     assign alloc_id    = free_candidate;
+    assign alloc_accept = alloc_req && alloc_ready;
+
+    // Guard the dynamic bit-select with the range check.
+    always_comb begin
+        free_accept = 1'b0;
+        if (free_valid && (free_id < NUM_DESC))
+            free_accept = allocated[free_id];
+    end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -45,24 +54,21 @@ module descriptor_manager #(
             allocated_count <= '0;
             free_error      <= 1'b0;
         end else begin
-            free_error <= 1'b0;
+            free_error <= free_valid && !free_accept;
 
-            // A release is accepted only for an in-range, currently allocated ID.
-            if (free_valid) begin
-                if ((free_id < NUM_DESC) && allocated[free_id]) begin
-                    allocated[free_id] <= 1'b0;
-                    allocated_count    <= allocated_count - 1'b1;
-                end else begin
-                    free_error <= 1'b1;
-                end
-            end
+            if (free_accept)
+                allocated[free_id] <= 1'b0;
 
-            // Allocation and release may occur in the same cycle for different IDs.
-            if (alloc_req && alloc_ready) begin
+            if (alloc_accept)
                 allocated[alloc_id] <= 1'b1;
-                if (!free_valid || free_error || !((free_id < NUM_DESC) && allocated[free_id]))
-                    allocated_count <= allocated_count + 1'b1;
-            end
+
+            // Account for both operations explicitly, including simultaneous
+            // allocation and release in the same cycle.
+            case ({alloc_accept, free_accept})
+                2'b10: allocated_count <= allocated_count + 1'b1;
+                2'b01: allocated_count <= allocated_count - 1'b1;
+                default: allocated_count <= allocated_count;
+            endcase
         end
     end
 
