@@ -58,12 +58,12 @@ gtkwave results/packet_buffer.vcd
 
 | Area | Checks included |
 |---|---|
-| Packet buffer | Single- and multi-beat traffic, partial keep, FIFO fill/drain, full backpressure, output ordering and sideband comparison |
+| Packet buffer | Single- and multi-beat traffic, partial keep, FIFO fill/drain, full backpressure, randomized ready/valid traffic, output ordering and sideband comparison |
 | Descriptor manager | Reset, first-fit allocation, pool exhaustion, valid release, duplicate release, out-of-range release, simultaneous allocate/release count |
-| Scoreboard | Accepted-beat reference queue; compares data, keep, and last on output handshakes |
-| Automation | Compile/run status and explicit PASS-signature checks |
+| Scoreboard | Accepted-beat reference queue; compares data, keep, and last on output handshakes; detects loss, duplication, reordering, and field corruption within exercised traffic |
+| Functional coverage | Counts empty/full cycles, input/output stalls, simultaneous transfers, partial-keep beats, and end-of-packet beats; required scenarios must be observed for the test to pass |\n| Automation | Compile/run status and explicit PASS-signature checks |
 
-The packet-buffer testbench currently reports its checked beat count in the simulation log. Randomized traffic, functional coverage, and a comprehensive set of protocol assertions are future extensions; they are not claimed as completed here.
+The packet-buffer testbench combines directed scenarios with 64 accepted randomized input beats, a queue-based reference scoreboard, an output-stability check during backpressure, and functional coverage counters for key FIFO and ready/valid scenarios. Coverage counters are reported in the simulation log, and the regression fails if required coverage points are not reached. This is a lightweight directed/randomized environment, not a formal proof or a complete protocol-assertion suite.
 
 ## Design documentation
 
