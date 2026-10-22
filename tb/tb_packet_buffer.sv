@@ -20,6 +20,8 @@ module tb_packet_buffer;
     integer sb_errors;
     integer sb_checked;
     integer i;
+    integer random_seed = 1;
+    integer seed_dummy;
     logic stalled_prev = 1'b0;
     logic [31:0] stalled_data;
     logic [3:0] stalled_keep;
@@ -110,7 +112,21 @@ module tb_packet_buffer;
         end
     endtask
 
+    // Occupancy must never exceed the configured FIFO capacity.
+    always @(posedge clk) begin
+        if (rst_n && occupancy > DEPTH) begin
+            $display("FAIL: occupancy exceeded DEPTH; occupancy=%0d", occupancy);
+            $fatal(1);
+        end
+    end
+
     initial begin
+        if ($value$plusargs("SEED=%d", random_seed)) begin
+            seed_dummy = $urandom(random_seed);
+        end else begin
+            seed_dummy = $urandom(random_seed);
+        end
+        $display("RANDOM_SEED: %0d", random_seed);
         $dumpfile("results/packet_buffer.vcd");
         $dumpvars(0, tb_packet_buffer);
 
