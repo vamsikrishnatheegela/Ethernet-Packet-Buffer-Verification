@@ -21,6 +21,7 @@ module tb_packet_buffer;
     integer sb_checked;
     integer i;
     integer random_seed = 1;
+    integer requested_seed = 1;
     integer seed_dummy;
     logic stalled_prev = 1'b0;
     logic [31:0] stalled_data;
@@ -121,12 +122,11 @@ module tb_packet_buffer;
     end
 
     initial begin
-        if ($value$plusargs("SEED=%d", random_seed)) begin
-            seed_dummy = $urandom(random_seed);
-        end else begin
-            seed_dummy = $urandom(random_seed);
-        end
-        $display("RANDOM_SEED: %0d", random_seed);
+        if (!$value$plusargs("SEED=%d", requested_seed))
+            requested_seed = 1;
+        random_seed = requested_seed;
+        seed_dummy = $urandom(random_seed);
+        $display("RANDOM_SEED: %0d", requested_seed);
         $dumpfile("results/packet_buffer.vcd");
         $dumpvars(0, tb_packet_buffer);
 
