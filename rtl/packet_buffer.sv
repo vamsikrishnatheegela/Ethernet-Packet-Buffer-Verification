@@ -36,7 +36,7 @@ module packet_buffer #(
 
     // Permit a replacement beat on the same cycle that a full FIFO pops.
     assign out_valid = (occupancy != 0);
-    assign in_ready  = (occupancy < DEPTH) || (out_valid && out_ready);
+    assign in_ready  = (int'(occupancy) < DEPTH) || (out_valid && out_ready);
 
     assign out_data = data_mem[rd_ptr];
     assign out_keep = keep_mem[rd_ptr];
@@ -55,14 +55,14 @@ module packet_buffer #(
                 data_mem[wr_ptr] <= in_data;
                 keep_mem[wr_ptr] <= in_keep;
                 last_mem[wr_ptr] <= in_last;
-                if (wr_ptr == DEPTH-1)
+                if (wr_ptr == PTR_WIDTH'(DEPTH-1))
                     wr_ptr <= '0;
                 else
                     wr_ptr <= wr_ptr + 1'b1;
             end
 
             if (pop) begin
-                if (rd_ptr == DEPTH-1)
+                if (rd_ptr == PTR_WIDTH'(DEPTH-1))
                     rd_ptr <= '0;
                 else
                     rd_ptr <= rd_ptr + 1'b1;
