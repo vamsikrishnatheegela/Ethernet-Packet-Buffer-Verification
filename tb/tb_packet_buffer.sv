@@ -25,6 +25,15 @@ module tb_packet_buffer;
     logic [3:0] stalled_keep;
     logic stalled_last;
 
+    // Lightweight functional coverage counters sampled at the active clock edge.
+    integer cov_empty_cycles = 0;
+    integer cov_full_cycles = 0;
+    integer cov_input_stalls = 0;
+    integer cov_output_stalls = 0;
+    integer cov_simultaneous_transfers = 0;
+    integer cov_partial_keep_beats = 0;
+    integer cov_last_beats = 0;
+
     always #5 clk = ~clk;
 
     packet_buffer #(.DEPTH(DEPTH)) dut (
@@ -45,11 +54,26 @@ module tb_packet_buffer;
         .error_count(sb_errors), .checked_count(sb_checked)
     );
 
-    // A valid output beat must remain asserted and unchanged while stalled.
+    // Sample functional coverage and check output stability under backpressure.
     always @(posedge clk) begin
         if (!rst_n) begin
             stalled_prev <= 1'b0;
         end else begin
+            if (occupancy == 0)
+                cov_empty_cycles <= cov_empty_cycles + 1;
+            if (occupancy == DEPTH)
+                cov_full_cycles <= cov_full_cycles + 1;
+            if (in_valid && !in_ready)
+                cov_input_stalls <= cov_input_stalls + 1;
+            if (out_valid && !out_ready)
+                cov_output_stalls <= cov_output_stalls + 1;
+            if (in_valid && in_ready && out_valid && out_ready)
+                cov_simultaneous_transfers <= cov_simultaneous_transfers + 1;
+            if (in_valid && in_ready && (in_keep != 4'b1111))
+                cov_partial_keep_beats <= cov_partial_keep_beats + 1;
+            if (in_valid && in_ready && in_last)
+                cov_last_beats <= cov_last_beats + 1;
+
             if (stalled_prev &&
                 ((!out_valid) || (out_data !== stalled_data) ||
                  (out_keep !== stalled_keep) || (out_last !== stalled_last))) begin
@@ -167,6 +191,22 @@ module tb_packet_buffer;
             $fatal(1);
         end
 
+        // Fail the regression if important FIFO/handshake scenarios were missed.
+        if ((cov_empty_cycles == 0) || (cov_full_cycles == 0) ||
+            (cov_output_stalls == 0) || (cov_simultaneous_transfers == 0) ||
+            (cov_partial_keep_beats == 0) || (cov_last_beats == 0)) begin
+            $display("FAIL: functional coverage requirement not met");
+            $display("coverage empty=%0d full=%0d in_stall=%0d out_stall=%0d simultaneous=%0d partial_keep=%0d last=%0d",
+                     cov_empty_cycles, cov_full_cycles, cov_input_stalls,
+                     cov_output_stalls, cov_simultaneous_transfers,
+                     cov_partial_keep_beats, cov_last_beats);
+            $fatal(1);
+        end
+
+        $display("COVERAGE: empty_cycles=%0d full_cycles=%0d input_stalls=%0d output_stalls=%0d simultaneous_transfers=%0d partial_keep_beats=%0d last_beats=%0d",
+                 cov_empty_cycles, cov_full_cycles, cov_input_stalls,
+                 cov_output_stalls, cov_simultaneous_transfers,
+                 cov_partial_keep_beats, cov_last_beats);
         $display("PASS: packet buffer regression; checked=%0d beats, errors=%0d", sb_checked, sb_errors);
         $finish;
     end
