@@ -44,7 +44,7 @@ module descriptor_manager #(
     // Guard the dynamic bit-select with the range check.
     always_comb begin
         free_accept = 1'b0;
-        if (free_valid && (free_id < NUM_DESC))
+        if (free_valid && (int'(free_id) < NUM_DESC))
             free_accept = allocated[free_id];
     end
 
