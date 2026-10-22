@@ -24,6 +24,10 @@ module tb_packet_buffer;
     integer requested_seed = 1;
     integer seed_dummy;
     logic stalled_prev = 1'b0;
+    logic input_stalled_prev = 1'b0;
+    logic [31:0] input_stalled_data;
+    logic [3:0] input_stalled_keep;
+    logic input_stalled_last;
     logic [31:0] stalled_data;
     logic [3:0] stalled_keep;
     logic stalled_last;
@@ -61,6 +65,7 @@ module tb_packet_buffer;
     always @(posedge clk) begin
         if (!rst_n) begin
             stalled_prev <= 1'b0;
+            input_stalled_prev <= 1'b0;
         end else begin
             if (occupancy == 0)
                 cov_empty_cycles <= cov_empty_cycles + 1;
@@ -83,6 +88,20 @@ module tb_packet_buffer;
                 $display("FAIL: output changed while stalled");
                 $fatal(1);
             end
+            // Ready/valid source must hold payload stable while input is stalled.
+            if (input_stalled_prev &&
+                ((!in_valid) || (in_data !== input_stalled_data) ||
+                 (in_keep !== input_stalled_keep) || (in_last !== input_stalled_last))) begin
+                $display("FAIL: input payload changed while stalled");
+                $fatal(1);
+            end
+            input_stalled_prev <= in_valid && !in_ready;
+            if (in_valid && !in_ready) begin
+                input_stalled_data <= in_data;
+                input_stalled_keep <= in_keep;
+                input_stalled_last <= in_last;
+            end
+
             stalled_prev <= out_valid && !out_ready;
             if (out_valid && !out_ready) begin
                 stalled_data <= out_data;
