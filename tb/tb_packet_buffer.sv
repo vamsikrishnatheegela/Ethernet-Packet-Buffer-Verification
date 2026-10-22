@@ -52,7 +52,11 @@ module tb_packet_buffer;
             in_data  = data;
             in_keep  = keep;
             in_last  = last;
-            do @(posedge clk); while (!in_ready);
+            // Check ready before the active edge; a push may make the FIFO full
+            // immediately after that edge, but the current beat was accepted.
+            while (in_ready !== 1'b1)
+                @(negedge clk);
+            @(posedge clk);
             @(negedge clk);
             in_valid = 1'b0;
         end
